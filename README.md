@@ -1,0 +1,79 @@
+# MLIT-LINKS-akiya-ask
+
+日本語で問いかけて探す、格安空き家ファインダー。
+
+国土交通省 Project LINKS の[空き家バンク登録物件(2025年度)](https://www.geospatial.jp/ckan/dataset/links-akiyabank-2025)(約7,700件)を、**DB不要の静的フロント**で全国横断検索する。「予算300万以内、農地付き、海の近くで古民家」のような日本語をそのまま投げて候補を得られる。
+
+## 特徴
+
+- **静的構成**: 物件データは静的JSON。検索・絞り込みはすべてクライアント側で完結。
+- **二系統の検索**(`進め方`どおりの設計):
+  - **AI検索** — 自然文を Anthropic API(`claude-sonnet-4-20250514`)で構造化フィルタJSONへ変換。
+    - claude.ai アーティファクト内: `window.claude.complete` を直接利用。
+    - 公開時(Cloudflare Pages): Pages Function `/api/search` 経由でAPIキーを秘匿。
+  - **キーワード検索** — AIが使えない環境(GitHub Pages等)では `filter.js` の素朴なパーサにフォールバック。
+- **絞り込み**: 都道府県/市区町村セレクト、価格・築年・特徴タグ。件数表示。
+- **原典誘導**: 各物件から自治体バンク原典リンクへ。
+
+## ディレクトリ構成
+
+```
+index.html                  画面
+assets/css/style.css        スタイル
+assets/js/prompt.js         自然文→フィルタJSON 変換プロンプト(共用)
+assets/js/filter.js         フィルタスキーマ・キーワードパーサ・マッチング
+assets/js/ai.js             AI検索クライアント(二系統の振り分け)
+assets/js/app.js            データ読込・UI制御・描画
+functions/api/search.js     Cloudflare Pages Function(Anthropic API、キー秘匿)
+data/akiya.sample.json      サンプルデータ(12件)
+data/akiya.json             本番データ(取り込みで生成。gitignore)
+scripts/import.mjs          pipeline JSON/CSV → 本スキーマ への変換
+docs/schema.md              データ & フィルタスキーマ設計
+```
+
+## ローカルで動かす
+
+静的ファイルなので任意の静的サーバでよい。
+
+```bash
+python3 -m http.server 8000
+# http://localhost:8000 を開く
+```
+
+`data/akiya.json` が無ければ自動で `data/akiya.sample.json` を表示する。
+この状態では AI検索は使えないため、自動でキーワード検索にフォールバックする。
+
+## 本番データの取り込み
+
+MLIT-LINKS-akiya-pipeline の正規化JSON、または生CSVから生成する。
+
+```bash
+node scripts/import.mjs <input.json|input.csv> data/akiya.json
+```
+
+列名は部分一致で対応付ける(都道府県/価格/築年/PR文/URL 等)。
+スキーマ詳細は [`docs/schema.md`](docs/schema.md) を参照。
+
+## デプロイ
+
+### Cloudflare Pages(AI検索あり・推奨)
+
+1. リポジトリを Cloudflare Pages に接続。ビルドコマンドなし、出力ディレクトリはルート。
+2. 環境変数に `ANTHROPIC_API_KEY` を設定(Functions から参照、クライアントには出ない)。
+   - 別オリジンから叩く場合のみ `ALLOW_ORIGIN` を設定。
+3. `functions/api/search.js` が自動でデプロイされ `/api/search` が有効になる。
+
+ローカルで Functions を試す場合(`wrangler` 利用):
+
+```bash
+echo 'ANTHROPIC_API_KEY = "sk-ant-..."' > .dev.vars   # gitignore 済み
+npx wrangler pages dev .
+```
+
+### GitHub Pages(AIなし・キーワード検索のみ)
+
+ルートをそのまま公開すれば動く。`/api/search` は存在しないため、自動でキーワード検索にフォールバックする。
+
+## ライセンス / 出典
+
+物件データの出典は国土交通省 Project LINKS。物件の最新状況は各自治体バンクの原典で確認すること。
