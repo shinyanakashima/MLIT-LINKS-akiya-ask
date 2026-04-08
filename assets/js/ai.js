@@ -1,30 +1,18 @@
-// ai.js — 二系統のAI検索クライアント
-// 1) claude.ai アーティファクト内: window.claude.complete を直接利用
-// 2) 公開時(Cloudflare Pages): /api/search (Pages Function, APIキー秘匿)
-// どちらも使えない/失敗した場合は呼び出し側が Filter.parseKeywordQuery にフォールバックする。
+// ai.js — AI検索クライアント(サーバ経路)
+// 公開時(Cloudflare Pages): /api/search (Pages Function) 経由で Anthropic API を呼ぶ。
+// APIキーはサーバ側に秘匿。サーバが無い/失敗した場合は呼び出し側が
+// Filter.parseKeywordQuery(キーワード検索)にフォールバックする。
 
 (function (global) {
   "use strict";
 
-  function hasArtifactAPI() {
-    return typeof global.claude === "object" && global.claude && typeof global.claude.complete === "function";
-  }
-
-  // 利用可能なモードを判定: "artifact" | "function" | "none"
-  // function モードの実在確認はリクエスト時に行う(起動時の余計なfetchを避ける)。
+  // 利用可能なモードを判定: "ai" | "none"
+  // file:// で開いた静的版にはサーバが無いので "none"。
+  // http(s) でも /api/search が無い場合(GitHub Pages 等)は、リクエスト時に
+  // 失敗 → 呼び出し側がキーワード検索へフォールバックする。
   function mode() {
-    if (hasArtifactAPI()) return "artifact";
-    // file:// で開いた静的版や GitHub Pages では Function は無い。
-    if (global.location && /^https?:$/.test(global.location.protocol)) return "function";
+    if (global.location && /^https?:$/.test(global.location.protocol)) return "ai";
     return "none";
-  }
-
-  async function viaArtifact(text) {
-    const prompt = `${global.Prompt.SYSTEM}\n\n${global.Prompt.buildUserPrompt(text)}`;
-    const raw = await global.claude.complete(prompt);
-    const obj = global.Prompt.extractFilterJSON(raw);
-    if (!obj) throw new Error("AI応答をJSONとして解釈できませんでした");
-    return global.Filter.normalize(obj);
   }
 
   async function viaFunction(text) {
@@ -44,14 +32,11 @@
 
   // 自然文 → 正規化済みフィルタ。失敗時は例外を投げる(呼び出し側でフォールバック)。
   async function search(text) {
-    switch (mode()) {
-      case "artifact": return viaArtifact(text);
-      case "function": return viaFunction(text);
-      default: throw new Error("AI検索は利用できません");
-    }
+    if (mode() === "ai") return viaFunction(text);
+    throw new Error("AI検索は利用できません");
   }
 
-  const api = { search, mode, hasArtifactAPI };
+  const api = { search, mode };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   global.AISearch = api;
 })(typeof window !== "undefined" ? window : globalThis);

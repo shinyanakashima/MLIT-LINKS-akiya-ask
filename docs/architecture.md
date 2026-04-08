@@ -20,15 +20,12 @@ flowchart TB
     end
 
     anthropic["Anthropic API<br/>claude-sonnet-4-20250514"]
-    artifact["window.claude.complete<br/>(claude.ai 内)"]
     source["自治体バンク原典サイト"]
 
     user --> idx --> app
     app -->|自然文| ai
-    ai -.->|モードA: claude.ai| artifact
-    ai -.->|モードB: 公開時| fn --> anthropic
-    artifact --> anthropic
-    ai -.->|モードC: 不可なら<br/>フォールバック| filter
+    ai -->|AI検索: サーバ経由| fn --> anthropic
+    ai -.->|サーバ無し/失敗なら<br/>フォールバック| filter
     prompt -.共用.- ai
     prompt -.同一プロンプト.- fn
 
@@ -40,22 +37,22 @@ flowchart TB
     app -->|原典リンク| source
 ```
 
-## 2. 検索1回の処理シーケンス(二系統 + フォールバック)
+## 2. 検索1回の処理シーケンス(AI検索 + フォールバック)
 
 ```mermaid
 sequenceDiagram
     participant U as 利用者
     participant App as app.js
     participant AI as ai.js
-    participant Src as AI(artifact / Function)
+    participant Fn as /api/search(Function)
     participant F as filter.js
     participant D as 物件JSON
 
     U->>App: 「予算300万以内、農地付き、海近い古民家」
     App->>AI: search(text)
-    alt AI検索が利用可能
-        AI->>Src: プロンプト送信(JSONのみ返すよう指示)
-        Src-->>AI: フィルタJSON文字列
+    alt サーバ(/api/search)が応答
+        AI->>Fn: プロンプト送信(JSONのみ返すよう指示)
+        Fn-->>AI: フィルタJSON文字列
         AI->>AI: extractFilterJSON → normalize
     else 利用不可 / 失敗
         AI-->>App: 例外
@@ -74,17 +71,13 @@ sequenceDiagram
 
 ```mermaid
 flowchart LR
-    subgraph A["claude.ai アーティファクト"]
-        a1["window.claude.complete<br/>= モードA(AI)"]
+    subgraph B["Cloudflare Pages(本番)"]
+        b1["/api/search + ANTHROPIC_API_KEY<br/>= AI検索(キー秘匿)"]
     end
-    subgraph B["Cloudflare Pages"]
-        b1["/api/search + ANTHROPIC_API_KEY<br/>= モードB(AI・キー秘匿)"]
+    subgraph C["GitHub Pages / file://(サーバ無し)"]
+        c1["/api/search 無し<br/>= キーワード検索"]
     end
-    subgraph C["GitHub Pages / file://"]
-        c1["Function なし<br/>= モードC(キーワード検索)"]
-    end
-    note["どのモードでも<br/>物件データ・絞り込み・原典誘導は共通"]
-    A --- note
+    note["どちらでも<br/>物件データ・絞り込み・原典誘導は共通"]
     B --- note
     C --- note
 ```

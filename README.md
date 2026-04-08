@@ -7,11 +7,11 @@
 ## 特徴
 
 - **静的構成**: 物件データは静的JSON。検索・絞り込みはすべてクライアント側で完結。
-- **二系統の検索**(`進め方`どおりの設計):
+- **二系統の検索**:
   - **AI検索** — 自然文を Anthropic API(`claude-sonnet-4-20250514`)で構造化フィルタJSONへ変換。
-    - claude.ai アーティファクト内: `window.claude.complete` を直接利用。
-    - 公開時(Cloudflare Pages): Pages Function `/api/search` 経由でAPIキーを秘匿。
-  - **キーワード検索** — AIが使えない環境(GitHub Pages等)では `filter.js` の素朴なパーサにフォールバック。
+    公開時(Cloudflare Pages)は Pages Function `/api/search` 経由でAPIキーをサーバ側に秘匿する。
+  - **キーワード検索** — サーバが無い/応答しない環境(ローカル・GitHub Pages・障害時)では
+    `filter.js` の素朴なパーサに自動フォールバック。
 - **絞り込み**: 都道府県/市区町村セレクト、価格・築年・特徴タグ。件数表示。
 - **原典誘導**: 各物件から自治体バンク原典リンクへ。
 
@@ -22,7 +22,7 @@ index.html                  画面
 assets/css/style.css        スタイル
 assets/js/prompt.js         自然文→フィルタJSON 変換プロンプト(共用)
 assets/js/filter.js         フィルタスキーマ・キーワードパーサ・マッチング
-assets/js/ai.js             AI検索クライアント(二系統の振り分け)
+assets/js/ai.js             AI検索クライアント(/api/search 経由)
 assets/js/app.js            データ読込・UI制御・描画
 functions/api/search.js     Cloudflare Pages Function(Anthropic API、キー秘匿)
 data/akiya.sample.json      サンプルデータ(12件)

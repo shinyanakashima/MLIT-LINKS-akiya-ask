@@ -132,7 +132,7 @@
       let filter, via;
       try {
         filter = await window.AISearch.search(text);
-        via = window.AISearch.mode() === "artifact" ? "AI(claude.ai)" : "AI";
+        via = "AI";
       } catch (aiErr) {
         // フォールバック: キーワードパーサ
         filter = F.parseKeywordQuery(text);
@@ -163,7 +163,7 @@
       b.addEventListener("click", () => { $("#query").value = b.textContent; runSearch(); }));
     // モード表示
     const m = window.AISearch.mode();
-    $("#mode-badge").textContent = m === "artifact" ? "AI検索 (claude.ai)" : m === "function" ? "AI検索 + キーワード" : "キーワード検索";
+    $("#mode-badge").textContent = m === "ai" ? "AI検索 + キーワード" : "キーワード検索";
   }
 
   async function init() {
