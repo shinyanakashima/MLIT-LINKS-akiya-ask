@@ -10,6 +10,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 const FEATURE_SYNONYMS = {
   海近い: ["海", "海辺", "海沿い", "ビーチ", "漁港"],
@@ -145,12 +146,102 @@ function normalizeRecord(rec, i) {
   };
 }
 
+// --- MLIT-LINKS-akiya-pipeline 正規化出力(ネスト/enum)→ 本アプリのフラットスキーマ ---
+// パイプラインは Stage1(生データ→構造化・enum化・PR文のAI分類)を担う。ここは
+// その出力を表示用スキーマへ射影する Stage2 アダプタ。
+// 参照: prompts/akiya-dataset.md(pipeline リポジトリ)
+
+// パイプライン形式の判定: ネストキーや enum 列の存在で見分ける。
+function isPipelineRecord(r) {
+  return !!r && typeof r === "object" &&
+    (r.location != null || r.deal_type != null || r.use_type != null || r.provenance != null || r.tags != null);
+}
+
+// use_type / tags / flags から本アプリの種別 enum を導出。
+function derivePropertyType(rec) {
+  const labels = (rec.tags && rec.tags.labels) || {};
+  const flags = rec.flags || {};
+  if (labels.kominka) return "古民家";
+  if (rec.use_type === "land") return "土地";
+  if (rec.use_type === "commercial" || flags.retail_premises) return "店舗";
+  if (rec.use_type === "residential") return "一戸建て"; // 既定
+  return null;
+}
+
+// renovation_needed(required/done/as_is/unknown)→ 三値。
+// unknown と欠損は「不明」= null(false へ丸めない)。
+function deriveRenovation(rec) {
+  const v = rec.tags && rec.tags.labels && rec.tags.labels.renovation_needed;
+  if (v === "required") return true;
+  if (v === "done" || v === "as_is") return false;
+  return null;
+}
+
+function fromPipeline(rec, i) {
+  const loc = rec.location || {};
+  const bld = rec.building || {};
+  const land = rec.land || {};
+  const labels = (rec.tags && rec.tags.labels) || {};
+  const flags = rec.flags || {};
+  const prov = rec.provenance || {};
+
+  const isRent = rec.deal_type === "rent";
+  const tx = rec.deal_type === "sale" ? "売買" : isRent ? "賃貸" : null;
+  // 価格: 売買のみ price に金額を入れる。賃貸は price=null とし、月額は priceText で表示。
+  const salePrice = parseYen(rec.price_yen);
+  const rentMonthly = parseYen(rec.rent_monthly_yen);
+  const price = isRent ? null : salePrice;
+  const man = (yen) => `${(yen / 10000).toLocaleString("ja-JP")}万円`;
+  const priceText = isRent
+    ? (rentMonthly != null ? `${man(rentMonthly)}/月` : "応相談")
+    : (salePrice != null ? man(salePrice) : "応相談");
+
+  // features: タグ由来(陽性のみ)+ PR文由来を統合。tags の false は「言及なし」≠「非該当」なので
+  // 陽性のみ採用。view_nature は粒度不足のため strong_points から海/山/川/温泉を補完。
+  const feats = new Set();
+  if (flags.farmland || labels.farmland_attached) feats.add("農地付き");
+  if (labels.parking_emphasized) feats.add("駐車場あり");
+  for (const f of deriveFeatures(rec.strong_points)) feats.add(f);
+
+  const prefecture = loc.prefecture || null;
+  const municipality = loc.city || null;
+  const address = [prefecture, municipality].filter(Boolean).join("") || null;
+
+  return {
+    id: rec.id != null && rec.id !== "" ? String(rec.id) : `rec-${String(i + 1).padStart(5, "0")}`,
+    prefecture,
+    municipality,
+    address,
+    price,
+    priceText,
+    transactionType: tx,
+    buildYear: parseYear(bld.construction_year),
+    structure: bld.structure || null,
+    floorArea: toNumber(bld.building_area_sqm),
+    landArea: toNumber(land.land_area_sqm),
+    propertyType: derivePropertyType(rec),
+    renovationRequired: deriveRenovation(rec),
+    features: [...feats],
+    strongPoints: rec.strong_points || null,
+    sourceUrl: prov.source_url || null,
+  };
+}
+
 function loadRecords(file) {
   const raw = fs.readFileSync(file, "utf8");
   if (file.toLowerCase().endsWith(".json")) {
     const json = JSON.parse(raw);
     const arr = Array.isArray(json) ? json : json.items || json.data || json.records || [];
-    return arr.map((r, i) => normalizeRecord(r, i));
+    const out = [];
+    arr.forEach((r, i) => {
+      if (isPipelineRecord(r)) {
+        if (r.status === "closed") return; // 成約済みは除外(募集中のみ表示)
+        out.push(fromPipeline(r, i));
+      } else {
+        out.push(normalizeRecord(r, i)); // 既にフラット/汎用JSON
+      }
+    });
+    return out;
   }
   // CSV
   const rows = parseCSV(raw).filter((r) => r.length && r.some((c) => c !== ""));
@@ -176,4 +267,7 @@ function main() {
   console.log(`${records.length} 件を ${output} に書き出しました。`);
 }
 
-main();
+// テストから import する場合は main を実行しない(直接起動時のみ実行)。
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main();
+
+export { fromPipeline, isPipelineRecord, derivePropertyType, deriveRenovation, normalizeRecord, loadRecords };

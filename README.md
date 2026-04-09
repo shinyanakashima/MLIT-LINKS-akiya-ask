@@ -51,8 +51,11 @@ MLIT-LINKS-akiya-pipeline の正規化JSON、または生CSVから生成する�
 node scripts/import.mjs <input.json|input.csv> data/akiya.json
 ```
 
-列名は部分一致で対応付ける(都道府県/価格/築年/PR文/URL 等)。
-スキーマ詳細は [`docs/schema.md`](docs/schema.md) を参照。
+- パイプラインのネスト/enum形式JSON(`prompts/akiya-dataset.md`)は、`location`/`deal_type`/
+  `tags` 等を検知して本スキーマへ射影する(成約済み `closed` は除外)。
+- 生CSVは列名の部分一致で対応付ける(都道府県/価格/築年/PR文/URL 等)。
+
+対応付けの詳細は [`docs/schema.md`](docs/schema.md) の「パイプライン出力からの対応付け」を参照。
 
 ## デプロイ
 

@@ -28,6 +28,29 @@ MLIT-LINKS-akiya-pipeline の正規化済みJSON、または生CSVから取り�
 | `strongPoints`        | string \| null   | PR文(STRONG_POINTS)。全文検索対象               |
 | `sourceUrl`           | string \| null   | 自治体バンク原典URL                               |
 
+### パイプライン出力からの対応付け(Stage2)
+
+`scripts/import.mjs` は MLIT-LINKS-akiya-pipeline のネスト/enum形式
+(`prompts/akiya-dataset.md`)を上表のフラットスキーマへ射影する。主な対応:
+
+| パイプライン                              | 本スキーマ            | 備考                                            |
+| ----------------------------------------- | --------------------- | ----------------------------------------------- |
+| `location.prefecture` / `location.city`   | `prefecture` / `municipality` | `address` は両者連結                    |
+| `deal_type` (`sale`/`rent`)               | `transactionType`     | 売買 / 賃貸                                     |
+| `price_yen`                               | `price`               | **売買のみ**。賃貸は `price=null`               |
+| `rent_monthly_yen`                        | `priceText`           | 賃貸は「◯万円/月」表記のみ(金額フィルタ対象外) |
+| `building.construction_year` / `structure` / `building_area_sqm` | `buildYear` / `structure` / `floorArea` |                |
+| `land.land_area_sqm`                      | `landArea`            |                                                 |
+| `use_type` / `tags.labels.kominka` / `flags.retail_premises` | `propertyType` | land→土地, commercial/retail→店舗, kominka→古民家, residential→一戸建て |
+| `tags.labels.renovation_needed`           | `renovationRequired`  | required→true, done/as_is→false, **unknown→null** |
+| `flags.farmland` / `tags.labels.farmland_attached` | `features:["農地付き"]` | 陽性のみ(`false`=「言及なし」≠非該当) |
+| `tags.labels.parking_emphasized`          | `features:["駐車場あり"]` |                                             |
+| `strong_points`                           | `strongPoints` + `features` 補完 | `view_nature` は粒度不足のためPR文から海/山/川/温泉を抽出 |
+| `provenance.source_url`                   | `sourceUrl`           |                                                 |
+
+- `status == "closed"`(成約済み)のレコードは取り込み時に除外する。
+- `null` は「不明」であり 0/非該当ではない(`unknown`→`null` を維持)。
+
 ## 2. フィルタスキーマ (AI / キーワードパーサの出力)
 
 自然文(例:「予算300万以内、農地付き、海の近くで古民家」)を変換した結果。
