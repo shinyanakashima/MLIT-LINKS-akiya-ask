@@ -106,5 +106,21 @@ const loaded = Import.loadRecords(tmp);
 fs.unlinkSync(tmp);
 check("closed は取り込み除外(1件のみ)", loaded.length === 1 && loaded[0].id === "p-001");
 
+console.log("# 取得スクリプト(オフライン: 引数解析・URL導出)");
+const Fetch = await import(path.join(root, "scripts/fetch-dataset.mjs"));
+const a0 = Fetch.parseArgs([]);
+check("既定タグ data-2025.1.0", a0.tag === Fetch.DEFAULT_TAG && a0.tag === "data-2025.1.0");
+check("既定出力 data/akiya.json", a0.out.endsWith(path.join("data", "akiya.json")));
+const a1 = Fetch.parseArgs(["data-2026.1.0", "--out", "/tmp/x.json", "--keep-raw"]);
+check("タグ上書き", a1.tag === "data-2026.1.0");
+check("--out 上書き", a1.out === "/tmp/x.json");
+check("--keep-raw フラグ", a1.keepRaw === true);
+const u = Fetch.assetUrls("data-2025.1.0");
+check("年度導出 2025", u.year === "2025");
+check("dataset URL", u.dataset === `https://github.com/${Fetch.REPO}/releases/download/data-2025.1.0/akiya-2025.json`);
+check("manifest URL", u.manifest === `https://github.com/${Fetch.REPO}/releases/download/data-2025.1.0/manifest.json`);
+let threw = false; try { Fetch.assetUrls("no-year"); } catch { threw = true; }
+check("年度無しタグは例外", threw);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

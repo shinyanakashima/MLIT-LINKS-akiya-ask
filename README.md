@@ -45,7 +45,22 @@ python3 -m http.server 8000
 
 ## 本番データの取り込み
 
-MLIT-LINKS-akiya-pipeline の正規化JSON、または生CSVから生成する。
+物件データ `data/akiya.json` は MLIT-LINKS-akiya-pipeline の成果物から生成する
+(本ファイルは Git 管理外。`data/akiya.sample.json` が無い場合のみフォールバック)。
+
+### 推奨: リリース成果物から取得(1コマンド)
+
+[`MLIT-LINKS-akiya-pipeline`](https://github.com/shinyanakashima/MLIT-LINKS-akiya-pipeline)
+の GitHub Release(成果物 `akiya-<year>.json`, CC-BY-4.0)を取得して取り込む。
+
+```bash
+node scripts/fetch-dataset.mjs            # 既定タグ data-2025.1.0 を取得→import
+node scripts/fetch-dataset.mjs data-2026.1.0   # 翌年版に切替
+```
+
+`manifest.json` の `registered` 件数と取り込み結果を照合する(不一致なら exit 2)。
+
+### 手動: 任意の JSON/CSV から生成
 
 ```bash
 node scripts/import.mjs <input.json|input.csv> data/akiya.json
