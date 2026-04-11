@@ -8,7 +8,7 @@
 
   // 利用可能なモードを判定: "ai" | "none"
   // file:// で開いた静的版にはサーバが無いので "none"。
-  // http(s) でも /api/search が無い場合(GitHub Pages 等)は、リクエスト時に
+  // http(s) でも /api/search が応答しない場合(APIエラー・障害時)は、リクエスト時に
   // 失敗 → 呼び出し側がキーワード検索へフォールバックする。
   function mode() {
     if (global.location && /^https?:$/.test(global.location.protocol)) return "ai";

@@ -10,7 +10,7 @@
 - **二系統の検索**:
   - **AI検索** — 自然文を Anthropic API(`claude-sonnet-4-20250514`)で構造化フィルタJSONへ変換。
     公開時(Cloudflare Pages)は Pages Function `/api/search` 経由でAPIキーをサーバ側に秘匿する。
-  - **キーワード検索** — サーバが無い/応答しない環境(ローカル・GitHub Pages・障害時)では
+  - **キーワード検索** — サーバ(`/api/search`)が応答しない場合(ローカル開発・APIエラー・障害時)は
     `filter.js` の素朴なパーサに自動フォールバック。
 - **絞り込み**: 都道府県/市区町村セレクト、価格・築年・特徴タグ。件数表示。
 - **原典誘導**: 各物件から自治体バンク原典リンクへ。
@@ -88,9 +88,7 @@ echo 'ANTHROPIC_API_KEY = "sk-ant-..."' > .dev.vars   # gitignore 済み
 npx wrangler pages dev .
 ```
 
-### GitHub Pages(AIなし・キーワード検索のみ)
-
-ルートをそのまま公開すれば動く。`/api/search` は存在しないため、自動でキーワード検索にフォールバックする。
+`/api/search` が応答しない場合(APIエラー・障害時)は、自動でキーワード検索にフォールバックする。
 
 ## ライセンス / 出典
 

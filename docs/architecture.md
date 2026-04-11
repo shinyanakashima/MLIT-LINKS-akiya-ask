@@ -67,19 +67,18 @@ sequenceDiagram
     App-->>U: 件数 + カード一覧 + 原典リンク
 ```
 
-## 3. デプロイ別の検索モード
+## 3. 検索モード(本番 = Cloudflare Pages)
 
 ```mermaid
 flowchart LR
-    subgraph B["Cloudflare Pages(本番)"]
-        b1["/api/search + ANTHROPIC_API_KEY<br/>= AI検索(キー秘匿)"]
+    subgraph CF["Cloudflare Pages(本番)"]
+        ok["/api/search 応答<br/>= AI検索(キー秘匿)"]
+        ng["/api/search 不通(APIエラー/障害)<br/>= キーワード検索フォールバック"]
     end
-    subgraph C["GitHub Pages / file://(サーバ無し)"]
-        c1["/api/search 無し<br/>= キーワード検索"]
-    end
-    note["どちらでも<br/>物件データ・絞り込み・原典誘導は共通"]
-    B --- note
-    C --- note
+    dev["ローカル開発(静的配信 / file://)<br/>= キーワード検索"]
+    note["いずれも<br/>物件データ・絞り込み・原典誘導は共通"]
+    CF --- note
+    dev --- note
 ```
 
 ## 4. データ取り込みパイプライン
