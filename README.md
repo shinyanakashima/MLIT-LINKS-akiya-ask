@@ -74,12 +74,24 @@ node scripts/import.mjs <input.json|input.csv> data/akiya.json
 
 ## デプロイ
 
-### Cloudflare Pages(AI検索あり・推奨)
+### Cloudflare Pages(GitHub 連携・自動デプロイ)
 
-1. リポジトリを Cloudflare Pages に接続。ビルドコマンドなし、出力ディレクトリはルート。
-2. 環境変数に `ANTHROPIC_API_KEY` を設定(Functions から参照、クライアントには出ない)。
+GitHub 連携を使い、`main` への push で自動デプロイする(PR ごとにプレビューURLも自動生成)。
+Cloudflare ダッシュボードでの設定:
+
+1. リポジトリを Cloudflare Pages に接続(Production branch = `main`)。
+2. ビルド設定:
+   - **Framework preset**: なし(None)
+   - **Build command**: `node scripts/fetch-dataset.mjs`
+   - **Build output directory**: `/`(ルート)
+   - ⚠️ `data/akiya.json` は Git 管理外のため、**ビルド時に上記コマンドで生成**する。
+     これを省くと本番データが無く `data/akiya.sample.json`(12件)にフォールバックする。
+3. 環境変数に `ANTHROPIC_API_KEY` を設定(Functions から参照、クライアントには出ない)。
    - 別オリジンから叩く場合のみ `ALLOW_ORIGIN` を設定。
-3. `functions/api/search.js` が自動でデプロイされ `/api/search` が有効になる。
+4. `functions/api/search.js` が自動でデプロイされ `/api/search` が有効になる。
+
+> 翌年版データに切り替えるときは Build command の引数でタグを指定:
+> `node scripts/fetch-dataset.mjs data-2026.1.0`
 
 ローカルで Functions を試す場合(`wrangler` 利用):
 
