@@ -1,5 +1,5 @@
 // ai.js — AI検索クライアント(サーバ経路)
-// 公開時(Cloudflare Pages): /api/search (Pages Function) 経由で Anthropic API を呼ぶ。
+// 公開時(Cloudflare Pages): /api/search (Pages Function) 経由で OpenAI API を呼ぶ。
 // APIキーはサーバ側に秘匿。サーバが無い/失敗した場合は呼び出し側が
 // Filter.parseKeywordQuery(キーワード検索)にフォールバックする。
 

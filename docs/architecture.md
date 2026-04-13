@@ -19,17 +19,17 @@ flowchart TB
         fn["/api/search<br/>functions/api/search.js<br/>APIキー秘匿"]
     end
 
-    anthropic["Anthropic API<br/>claude-sonnet-4-20250514"]
+    llm["OpenAI API<br/>gpt-4o-mini"]
     source["自治体バンク原典サイト"]
 
     user --> idx --> app
     app -->|自然文| ai
-    ai -->|AI検索: サーバ経由| fn --> anthropic
+    ai -->|AI検索: サーバ経由| fn --> llm
     ai -.->|サーバ無し/失敗なら<br/>フォールバック| filter
     prompt -.共用.- ai
     prompt -.同一プロンプト.- fn
 
-    anthropic -->|フィルタJSON| ai
+    llm -->|フィルタJSON| ai
     ai -->|正規化フィルタ| filter
     data --> filter
     filter -->|絞り込み結果| app

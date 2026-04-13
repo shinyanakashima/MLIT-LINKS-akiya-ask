@@ -8,7 +8,7 @@
 
 - **静的構成**: 物件データは静的JSON。検索・絞り込みはすべてクライアント側で完結。
 - **二系統の検索**:
-  - **AI検索** — 自然文を Anthropic API(`claude-sonnet-4-20250514`)で構造化フィルタJSONへ変換。
+  - **AI検索** — 自然文を OpenAI API(`gpt-4o-mini`)で構造化フィルタJSONへ変換。
     公開時(Cloudflare Pages)は Pages Function `/api/search` 経由でAPIキーをサーバ側に秘匿する。
   - **キーワード検索** — サーバ(`/api/search`)が応答しない場合(ローカル開発・APIエラー・障害時)は
     `filter.js` の素朴なパーサに自動フォールバック。
@@ -24,7 +24,7 @@ assets/js/prompt.js         自然文→フィルタJSON 変換プロンプト(�
 assets/js/filter.js         フィルタスキーマ・キーワードパーサ・マッチング
 assets/js/ai.js             AI検索クライアント(/api/search 経由)
 assets/js/app.js            データ読込・UI制御・描画
-functions/api/search.js     Cloudflare Pages Function(Anthropic API、キー秘匿)
+functions/api/search.js     Cloudflare Pages Function(OpenAI API、キー秘匿)
 data/akiya.sample.json      サンプルデータ(12件)
 data/akiya.json             本番データ(取り込みで生成。gitignore)
 scripts/import.mjs          pipeline JSON/CSV → 本スキーマ への変換
@@ -86,8 +86,8 @@ Cloudflare ダッシュボードでの設定:
    - **Build output directory**: `/`(ルート)
    - ⚠️ `data/akiya.json` は Git 管理外のため、**ビルド時に上記コマンドで生成**する。
      これを省くと本番データが無く `data/akiya.sample.json`(12件)にフォールバックする。
-3. 環境変数に `ANTHROPIC_API_KEY` を設定(Functions から参照、クライアントには出ない)。
-   - 別オリジンから叩く場合のみ `ALLOW_ORIGIN` を設定。
+3. 環境変数に `OPENAI_API_KEY` を設定(Functions から参照、クライアントには出ない)。
+   - 任意で `OPENAI_MODEL`(既定 `gpt-4o-mini`)、別オリジンから叩く場合のみ `ALLOW_ORIGIN` を設定。
 4. `functions/api/search.js` が自動でデプロイされ `/api/search` が有効になる。
 
 > 翌年版データに切り替えるときは Build command の引数でタグを指定:
@@ -96,7 +96,7 @@ Cloudflare ダッシュボードでの設定:
 ローカルで Functions を試す場合(`wrangler` 利用):
 
 ```bash
-echo 'ANTHROPIC_API_KEY = "sk-ant-..."' > .dev.vars   # gitignore 済み
+echo 'OPENAI_API_KEY = "sk-..."' > .dev.vars   # gitignore 済み
 npx wrangler pages dev .
 ```
 

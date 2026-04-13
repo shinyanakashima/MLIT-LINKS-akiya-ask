@@ -1,9 +1,9 @@
 // Cloudflare Pages Function: POST /api/search
-// 自然文クエリを Anthropic API でフィルタJSONへ変換して返す。APIキーはサーバ側に秘匿。
-// 必要な環境変数: ANTHROPIC_API_KEY
-// 任意: ALLOW_ORIGIN(CORS用。未設定なら同一オリジン想定で省略)
+// 自然文クエリを OpenAI API でフィルタJSONへ変換して返す。APIキーはサーバ側に秘匿。
+// 必要な環境変数: OPENAI_API_KEY
+// 任意: OPENAI_MODEL(既定 gpt-4o-mini)、ALLOW_ORIGIN(CORS用。未設定なら同一オリジン想定で省略)
 
-const MODEL = "claude-sonnet-4-20250514";
+const DEFAULT_MODEL = "gpt-4o-mini";
 
 // プロンプトは assets/js/prompt.js と同一仕様(Workers ランタイムのため自己完結で再掲)。
 const SYSTEM = `あなたは日本の空き家・移住物件検索の入力解析器です。ユーザーの日本語の要望を、検索フィルタJSONに変換します。
@@ -73,8 +73,8 @@ export async function onRequestOptions({ env }) {
 }
 
 export async function onRequestPost({ request, env }) {
-  if (!env.ANTHROPIC_API_KEY) {
-    return jsonResponse({ error: "ANTHROPIC_API_KEY が未設定です" }, 500, env);
+  if (!env.OPENAI_API_KEY) {
+    return jsonResponse({ error: "OPENAI_API_KEY が未設定です" }, 500, env);
   }
   let query = "";
   try {
@@ -87,26 +87,30 @@ export async function onRequestPost({ request, env }) {
   if (query.length > 500) query = query.slice(0, 500);
 
   try {
-    const apiRes = await fetch("https://api.anthropic.com/v1/messages", {
+    const apiRes = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": env.ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
+        "Authorization": `Bearer ${env.OPENAI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: MODEL,
+        model: env.OPENAI_MODEL || DEFAULT_MODEL,
         max_tokens: 512,
-        system: SYSTEM,
-        messages: [{ role: "user", content: `次の要望をフィルタJSONに変換してください。JSONのみ出力:\n\n要望: ${query}` }],
+        temperature: 0,
+        // JSON のみを返すよう強制(SYSTEM に "JSON" の語が含まれることが前提)。
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: SYSTEM },
+          { role: "user", content: `次の要望をフィルタJSONに変換してください。JSONのみ出力:\n\n要望: ${query}` },
+        ],
       }),
     });
     if (!apiRes.ok) {
       const detail = await apiRes.text().catch(() => "");
-      return jsonResponse({ error: "Anthropic API エラー", status: apiRes.status, detail: detail.slice(0, 200) }, 502, env);
+      return jsonResponse({ error: "OpenAI API エラー", status: apiRes.status, detail: detail.slice(0, 200) }, 502, env);
     }
     const data = await apiRes.json();
-    const text = (data.content || []).filter((b) => b.type === "text").map((b) => b.text).join("");
+    const text = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || "";
     const filter = extractFilterJSON(text);
     if (!filter) return jsonResponse({ error: "応答をJSONとして解釈できませんでした", raw: text.slice(0, 200) }, 502, env);
     return jsonResponse({ filter }, 200, env);
