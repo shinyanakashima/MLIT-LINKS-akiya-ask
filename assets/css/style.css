@@ -100,3 +100,12 @@ main { padding: 22px 0 40px; }
   .selects { width: 100%; }
   .selects select { flex: 1; min-width: 0; }
 }
+
+/* もっと見る(段階描画) */
+.more { display: flex; justify-content: center; margin: 22px 0 8px; }
+.more[hidden] { display: none; }
+.more-btn {
+  background: var(--card); color: var(--accent-dark); font-weight: 700;
+  border: 1px solid var(--line); box-shadow: var(--shadow); padding: 11px 22px;
+}
+.more-btn:hover { background: var(--tag); }

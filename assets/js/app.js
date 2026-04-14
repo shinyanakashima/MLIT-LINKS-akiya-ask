@@ -8,6 +8,7 @@
     filter: F.emptyFilter(),
     manual: { prefecture: "", municipality: "" }, // 手動セレクト
     results: [],
+    shown: 0,         // 現在描画済みの件数(段階描画用)
   };
 
   const $ = (sel) => document.querySelector(sel);
@@ -59,6 +60,10 @@
   }
 
   // ---- 描画 ----
+  // 全件(最大7千件超)を一度に innerHTML へ流すと重いので、PAGE_SIZE 単位で
+  // 段階描画する。「もっと見る」で続きを追記。
+  const PAGE_SIZE = 60;
+
   function render() {
     const f = effectiveFilter();
     state.results = F.applyFilter(state.all, f);
@@ -67,9 +72,35 @@
     const list = $("#results");
     if (!state.results.length) {
       list.innerHTML = '<li class="empty">条件に合う物件がありません。条件をゆるめてみてください。</li>';
+      state.shown = 0;
+      updateMore();
       return;
     }
-    list.innerHTML = state.results.map(cardHTML).join("");
+    // 先頭ページを描画(置き換え)。
+    state.shown = Math.min(PAGE_SIZE, state.results.length);
+    list.innerHTML = state.results.slice(0, state.shown).map(cardHTML).join("");
+    updateMore();
+  }
+
+  // 続きを追記(全置換せず append でDOM負荷を抑える)。
+  function showMore() {
+    const next = Math.min(state.shown + PAGE_SIZE, state.results.length);
+    const html = state.results.slice(state.shown, next).map(cardHTML).join("");
+    $("#results").insertAdjacentHTML("beforeend", html);
+    state.shown = next;
+    updateMore();
+  }
+
+  // 「もっと見る」ボタンの表示・文言を現在の表示件数に合わせる。
+  function updateMore() {
+    const more = $("#more");
+    const remaining = state.results.length - state.shown;
+    if (remaining > 0) {
+      $("#more-btn").textContent = `もっと見る(残り${remaining.toLocaleString("ja-JP")}件)`;
+      more.hidden = false;
+    } else {
+      more.hidden = true;
+    }
   }
 
   function cardHTML(it) {
@@ -149,6 +180,7 @@
 
   function bindUI() {
     $("#search-btn").addEventListener("click", runSearch);
+    $("#more-btn").addEventListener("click", showMore);
     $("#query").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey || !e.shiftKey)) { e.preventDefault(); runSearch(); } });
     $("#clear-btn").addEventListener("click", () => {
       $("#query").value = "";
