@@ -109,3 +109,11 @@ main { padding: 22px 0 40px; }
   border: 1px solid var(--line); box-shadow: var(--shadow); padding: 11px 22px;
 }
 .more-btn:hover { background: var(--tag); }
+
+/* 言語切替 */
+.topbar { display: flex; justify-content: flex-end; margin-bottom: 4px; }
+.lang-btn {
+  background: rgba(255, 255, 255, .15); color: #fff; border: 1px solid rgba(255, 255, 255, .35);
+  padding: 5px 14px; border-radius: 999px; font-size: .8rem; font-weight: 700;
+}
+.lang-btn:hover { background: rgba(255, 255, 255, .28); }

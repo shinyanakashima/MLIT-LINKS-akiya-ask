@@ -10,32 +10,29 @@
 <body>
   <header class="hero">
     <div class="wrap">
-      <h1>空き家ファインダー</h1>
-      <p class="lead">日本語で問いかけて探す、格安空き家・移住先。<span id="mode-badge" class="badge"></span></p>
+      <div class="topbar">
+        <button id="lang-btn" type="button" class="lang-btn"></button>
+      </div>
+      <h1 data-i18n="appName">空き家ファインダー</h1>
+      <p class="lead"><span data-i18n="lead">日本語で問いかけて探す、格安空き家・移住先。</span> <span id="mode-badge" class="badge"></span></p>
 
       <div class="search">
-        <textarea id="query" rows="2" placeholder="例)予算300万以内、農地付き、海の近くで古民家"></textarea>
+        <textarea id="query" rows="2" data-i18n-ph="placeholder" placeholder="例)予算300万以内、農地付き、海の近くで古民家"></textarea>
         <div class="search-actions">
-          <button id="search-btn" class="primary">検索</button>
-          <button id="clear-btn" class="ghost">クリア</button>
+          <button id="search-btn" class="primary" data-i18n="search">検索</button>
+          <button id="clear-btn" class="ghost" data-i18n="clear">クリア</button>
         </div>
       </div>
 
-      <div class="examples">
-        <span>例:</span>
-        <button class="example">予算300万以内、農地付き、海の近くで古民家</button>
-        <button class="example">築30年以内で改修不要、駐車場あり</button>
-        <button class="example">高知県の川の近く、200万円まで</button>
-        <button class="example">離島で温泉が近い物件</button>
-      </div>
+      <div class="examples" id="examples"></div>
     </div>
   </header>
 
   <main class="wrap">
     <section class="controls">
       <div class="selects">
-        <select id="pref-select" aria-label="都道府県"></select>
-        <select id="muni-select" aria-label="市区町村" disabled></select>
+        <select id="pref-select" data-i18n-aria="prefAria" aria-label="都道府県"></select>
+        <select id="muni-select" data-i18n-aria="muniAria" aria-label="市区町村" disabled></select>
       </div>
       <div class="summary">
         <span id="count" class="count">0件</span>
@@ -52,13 +49,14 @@
   </main>
 
   <footer class="wrap foot">
-    <p>
+    <p data-i18n-html="footerHtml">
       データ出典: 国土交通省 Project LINKS
       <a href="https://www.geospatial.jp/ckan/dataset/links-akiyabank-2025" target="_blank" rel="noopener noreferrer">空き家バンク登録物件(2025年度)</a>。
       物件の最新状況は各自治体バンク原典をご確認ください。
     </p>
   </footer>
 
+  <script src="assets/js/i18n.js"></script>
   <script src="assets/js/prompt.js"></script>
   <script src="assets/js/filter.js"></script>
   <script src="assets/js/ai.js"></script>

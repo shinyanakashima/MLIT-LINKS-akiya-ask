@@ -3,16 +3,20 @@
   "use strict";
 
   const F = window.Filter;
+  const T = window.I18N;
   const state = {
     all: [],          // 全物件
     filter: F.emptyFilter(),
     manual: { prefecture: "", municipality: "" }, // 手動セレクト
     results: [],
     shown: 0,         // 現在描画済みの件数(段階描画用)
+    lang: "ja",       // UI言語
+    status: null,     // 直近ステータスの生成関数(言語切替時に再評価)
+    statusError: false,
   };
 
   const $ = (sel) => document.querySelector(sel);
-  const yen = (n) => (n == null ? "応相談" : "¥" + n.toLocaleString("ja-JP"));
+  const yen = (n) => (n == null ? T.t("priceAsk") : "¥" + n.toLocaleString("ja-JP"));
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
   // ---- データ読込: 正規化JSON優先、なければサンプル ----
@@ -24,12 +28,13 @@
         if (!res.ok) continue;
         const json = await res.json();
         if (Array.isArray(json) && json.length) {
-          setStatus(url.endsWith("sample.json") ? "サンプルデータを表示中(data/akiya.json を置くと本番データに切替)" : `${json.length}件のデータを読込`);
+          if (url.endsWith("sample.json")) setStatus(() => T.t("statusSample"));
+          else setStatus(() => T.t("loaded", json.length));
           return json;
         }
       } catch (e) { /* 次の候補へ */ }
     }
-    setStatus("データを読み込めませんでした。data/akiya.json または data/akiya.sample.json を配置してください。", true);
+    setStatus(() => T.t("statusLoadError"), true);
     return [];
   }
 
@@ -38,12 +43,12 @@
     const prefSel = $("#pref-select");
     const muniSel = $("#muni-select");
     const prefs = [...new Set(state.all.map((x) => x.prefecture).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ja"));
-    prefSel.innerHTML = '<option value="">都道府県(すべて)</option>' + prefs.map((p) => `<option value="${esc(p)}">${esc(p)}</option>`).join("");
+    prefSel.innerHTML = `<option value="">${esc(T.t("prefAll"))}</option>` + prefs.map((p) => `<option value="${esc(p)}">${esc(p)}</option>`).join("");
 
     function refreshMuni() {
       const p = prefSel.value;
       const munis = [...new Set(state.all.filter((x) => !p || x.prefecture === p).map((x) => x.municipality).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ja"));
-      muniSel.innerHTML = '<option value="">市区町村(すべて)</option>' + munis.map((m) => `<option value="${esc(m)}">${esc(m)}</option>`).join("");
+      muniSel.innerHTML = `<option value="">${esc(T.t("muniAll"))}</option>` + munis.map((m) => `<option value="${esc(m)}">${esc(m)}</option>`).join("");
       muniSel.disabled = munis.length === 0;
     }
     refreshMuni();
@@ -67,11 +72,11 @@
   function render() {
     const f = effectiveFilter();
     state.results = F.applyFilter(state.all, f);
-    $("#count").textContent = `${state.results.length}件`;
+    $("#count").textContent = T.t("count", state.results.length);
     renderChips(f);
     const list = $("#results");
     if (!state.results.length) {
-      list.innerHTML = '<li class="empty">条件に合う物件がありません。条件をゆるめてみてください。</li>';
+      list.innerHTML = `<li class="empty">${esc(T.t("empty"))}</li>`;
       state.shown = 0;
       updateMore();
       return;
@@ -96,7 +101,7 @@
     const more = $("#more");
     const remaining = state.results.length - state.shown;
     if (remaining > 0) {
-      $("#more-btn").textContent = `もっと見る(残り${remaining.toLocaleString("ja-JP")}件)`;
+      $("#more-btn").textContent = T.t("more", remaining);
       more.hidden = false;
     } else {
       more.hidden = true;
@@ -105,14 +110,14 @@
 
   function cardHTML(it) {
     const meta = [
-      it.propertyType,
-      it.buildYear ? `築${F.CURRENT_YEAR - it.buildYear}年(${it.buildYear})` : null,
+      it.propertyType ? T.propertyType(it.propertyType) : null,
+      it.buildYear ? T.t("ageMeta", F.CURRENT_YEAR - it.buildYear, it.buildYear) : null,
       it.structure,
       it.floorArea ? `${it.floorArea}㎡` : null,
-      it.renovationRequired === true ? "要改修" : it.renovationRequired === false ? "改修不要" : null,
+      it.renovationRequired === true ? T.t("renovReq") : it.renovationRequired === false ? T.t("renovNo") : null,
     ].filter(Boolean);
-    const tags = (it.features || []).map((t) => `<span class="tag">${esc(t)}</span>`).join("");
-    const link = it.sourceUrl ? `<a class="source" href="${esc(it.sourceUrl)}" target="_blank" rel="noopener noreferrer">自治体バンク原典 ↗</a>` : "";
+    const tags = (it.features || []).map((t) => `<span class="tag">${esc(T.feature(t))}</span>`).join("");
+    const link = it.sourceUrl ? `<a class="source" href="${esc(it.sourceUrl)}" target="_blank" rel="noopener noreferrer">${esc(T.t("source"))}</a>` : "";
     return `<li class="card">
       <div class="card-head">
         <span class="place">${esc(it.prefecture || "")} ${esc(it.municipality || "")}</span>
@@ -128,30 +133,75 @@
   // 適用中条件のチップ表示
   function renderChips(f) {
     const chips = [];
-    if (f.keywords.length) chips.push(`キーワード: ${f.keywords.join(" / ")}`);
-    if (f.prefectures.length) chips.push(`都道府県: ${f.prefectures.join("・")}`);
-    if (f.municipalities.length) chips.push(`市区町村: ${f.municipalities.join("・")}`);
-    if (f.priceMax != null) chips.push(`〜${yen(f.priceMax)}`);
-    if (f.priceMin != null) chips.push(`${yen(f.priceMin)}〜`);
-    if (f.ageMax != null) chips.push(`築${f.ageMax}年以内`);
-    if (f.buildYearMin != null) chips.push(`${f.buildYearMin}年以降`);
-    if (f.propertyTypes.length) chips.push(`種別: ${f.propertyTypes.join("・")}`);
-    if (f.transactionType) chips.push(f.transactionType);
-    if (f.renovationRequired === true) chips.push("要改修");
-    if (f.renovationRequired === false) chips.push("改修不要");
-    f.features.forEach((x) => chips.push(x));
-    $("#chips").innerHTML = chips.length ? chips.map((c) => `<span class="chip">${esc(c)}</span>`).join("") : '<span class="chip muted">条件なし(全件)</span>';
+    if (f.keywords.length) chips.push(`${T.t("chipKeyword")}: ${f.keywords.join(" / ")}`);
+    if (f.prefectures.length) chips.push(`${T.t("chipPref")}: ${f.prefectures.join("・")}`);
+    if (f.municipalities.length) chips.push(`${T.t("chipMuni")}: ${f.municipalities.join("・")}`);
+    if (f.priceMax != null) chips.push(T.t("priceMax", yen(f.priceMax)));
+    if (f.priceMin != null) chips.push(T.t("priceMin", yen(f.priceMin)));
+    if (f.ageMax != null) chips.push(T.t("ageMax", f.ageMax));
+    if (f.buildYearMin != null) chips.push(T.t("buildYearMin", f.buildYearMin));
+    if (f.propertyTypes.length) chips.push(`${T.t("chipType")}: ${f.propertyTypes.map((t) => T.propertyType(t)).join("・")}`);
+    if (f.transactionType) chips.push(f.transactionType === "売買" ? T.t("txSale") : T.t("txRent"));
+    if (f.renovationRequired === true) chips.push(T.t("renovReq"));
+    if (f.renovationRequired === false) chips.push(T.t("renovNo"));
+    f.features.forEach((x) => chips.push(T.feature(x)));
+    $("#chips").innerHTML = chips.length ? chips.map((c) => `<span class="chip">${esc(c)}</span>`).join("") : `<span class="chip muted">${esc(T.t("noCondition"))}</span>`;
   }
 
-  function setStatus(msg, isError) {
+  // ステータスは「生成関数」で保持し、言語切替時に再評価できるようにする。
+  function setStatus(producer, isError) {
+    state.status = typeof producer === "function" ? producer : (producer ? () => producer : null);
+    state.statusError = !!isError;
     const el = $("#status");
-    el.textContent = msg;
+    el.textContent = state.status ? state.status() : "";
     el.classList.toggle("error", !!isError);
   }
 
   function setSearching(on) {
     $("#search-btn").disabled = on;
-    $("#search-btn").textContent = on ? "検索中…" : "検索";
+    $("#search-btn").textContent = on ? T.t("searching") : T.t("search");
+  }
+
+  // 例文ボタンを現在の言語で描画(クリックで本文を検索)。
+  function renderExamples() {
+    const box = $("#examples");
+    const label = `<span>${esc(T.t("examplesLabel"))}</span>`;
+    const btns = T.t("examples").map((ex) => `<button class="example">${esc(ex)}</button>`).join("");
+    box.innerHTML = label + btns;
+    box.querySelectorAll(".example").forEach((b) =>
+      b.addEventListener("click", () => { $("#query").value = b.textContent; runSearch(); }));
+  }
+
+  function updateBadge() {
+    $("#mode-badge").textContent = window.AISearch.mode() === "ai" ? T.t("modeAi") : T.t("modeKeyword");
+  }
+
+  // 言語を適用(静的ラベル・属性・例文・セレクト・バッジ・結果・ステータスを再描画)。
+  function applyLang(lang) {
+    state.lang = lang;
+    T.setLang(lang);
+    try { localStorage.setItem("akiya-lang", lang); } catch (e) { /* 無視 */ }
+    document.documentElement.lang = lang;
+    document.title = T.t("title");
+    document.querySelectorAll("[data-i18n]").forEach((el) => { el.textContent = T.t(el.dataset.i18n); });
+    document.querySelectorAll("[data-i18n-html]").forEach((el) => { el.innerHTML = T.t(el.dataset.i18nHtml); });
+    document.querySelectorAll("[data-i18n-ph]").forEach((el) => { el.placeholder = T.t(el.dataset.i18nPh); });
+    document.querySelectorAll("[data-i18n-aria]").forEach((el) => { el.setAttribute("aria-label", T.t(el.dataset.i18nAria)); });
+    const langBtn = $("#lang-btn");
+    langBtn.textContent = T.t("langBtn");
+    langBtn.setAttribute("aria-label", T.t("langBtnAria"));
+    renderExamples();
+    // セレクトの「すべて」ラベルを更新(選択値は保持)。
+    const ps = $("#pref-select"), ms = $("#muni-select");
+    if (ps.options[0]) ps.options[0].textContent = T.t("prefAll");
+    if (ms.options[0]) ms.options[0].textContent = T.t("muniAll");
+    if (!$("#search-btn").disabled) $("#search-btn").textContent = T.t("search");
+    updateBadge();
+    render();
+    // ステータスを現在言語で再評価。
+    const el = $("#status");
+    el.textContent = state.status ? state.status() : "";
+    el.classList.toggle("error", state.statusError);
   }
 
   // ---- 検索実行 ----
@@ -160,18 +210,18 @@
     if (!text) { state.filter = F.emptyFilter(); render(); return; }
     setSearching(true);
     try {
-      let filter, via;
+      let filter, viaKey;
       try {
         filter = await window.AISearch.search(text);
-        via = "AI";
+        viaKey = "viaAI";
       } catch (aiErr) {
         // フォールバック: キーワードパーサ
         filter = F.parseKeywordQuery(text);
-        via = "キーワード検索";
+        viaKey = "viaKeyword";
         console.warn("AI検索フォールバック:", aiErr && aiErr.message);
       }
       state.filter = filter;
-      setStatus(`「${text}」を${via}で解析しました`);
+      setStatus(() => T.t("parsed", text, T.t(viaKey)));
       render();
     } finally {
       setSearching(false);
@@ -181,6 +231,7 @@
   function bindUI() {
     $("#search-btn").addEventListener("click", runSearch);
     $("#more-btn").addEventListener("click", showMore);
+    $("#lang-btn").addEventListener("click", () => applyLang(state.lang === "ja" ? "en" : "ja"));
     $("#query").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey || !e.shiftKey)) { e.preventDefault(); runSearch(); } });
     $("#clear-btn").addEventListener("click", () => {
       $("#query").value = "";
@@ -188,21 +239,18 @@
       state.manual = { prefecture: "", municipality: "" };
       state.filter = F.emptyFilter();
       $("#pref-select").dispatchEvent(new Event("change"));
-      setStatus("条件をクリアしました");
+      setStatus(() => T.t("statusCleared"));
     });
-    // 例文クリック
-    document.querySelectorAll(".example").forEach((b) =>
-      b.addEventListener("click", () => { $("#query").value = b.textContent; runSearch(); }));
-    // モード表示
-    const m = window.AISearch.mode();
-    $("#mode-badge").textContent = m === "ai" ? "AI検索 + キーワード" : "キーワード検索";
   }
 
   async function init() {
+    let saved = "ja";
+    try { saved = localStorage.getItem("akiya-lang") || "ja"; } catch (e) { /* 無視 */ }
+    state.lang = saved; T.setLang(saved);
     bindUI();
     state.all = await loadData();
     buildLocationSelects();
-    render();
+    applyLang(saved); // 静的ラベル・例文・結果・ステータスを一括描画
   }
 
   document.addEventListener("DOMContentLoaded", init);
