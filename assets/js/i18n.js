@@ -12,8 +12,7 @@
       lead: "日本語で問いかけて探す、格安空き家・移住先。",
       placeholder: "例)予算300万以内、農地付き、海の近くで古民家",
       search: "検索", searching: "検索中…", clear: "クリア",
-      examplesLabel: "例:",
-      examples: [
+      examplesLabel: "例:",      examples: [
         "予算300万以内、農地付き、海の近くで古民家",
         "築30年以内で改修不要、駐車場あり",
         "高知県の川の近く、200万円まで",
@@ -22,6 +21,7 @@
       prefAll: "都道府県(すべて)", muniAll: "市区町村(すべて)",
       prefAria: "都道府県", muniAria: "市区町村",
       langBtn: "EN", langBtnAria: "Switch to English",
+      keywordNote: "", // 日本語モードでは非表示(英語モードのみ表示)
       modeAi: "AI検索 + キーワード", modeKeyword: "キーワード検索",
       empty: "条件に合う物件がありません。条件をゆるめてみてください。",
       source: "自治体バンク原典 ↗",
@@ -59,6 +59,7 @@
       prefAll: "Prefecture (all)", muniAll: "City / town (all)",
       prefAria: "Prefecture", muniAria: "City / town",
       langBtn: "日本語", langBtnAria: "日本語に切り替え",
+      keywordNote: "Note: English queries work via AI search only. The keyword fallback (used when AI search is unavailable) supports Japanese input only.",
       modeAi: "AI + keyword", modeKeyword: "Keyword",
       empty: "No properties match. Try loosening your criteria.",
       source: "Source: municipal bank ↗",

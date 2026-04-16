@@ -191,6 +191,8 @@
     langBtn.textContent = T.t("langBtn");
     langBtn.setAttribute("aria-label", T.t("langBtnAria"));
     renderExamples();
+    // 英語モードのみ「キーワード検索は日本語のみ」の注記を表示。
+    $("#lang-note").hidden = lang !== "en";
     // セレクトの「すべて」ラベルを更新(選択値は保持)。
     const ps = $("#pref-select"), ms = $("#muni-select");
     if (ps.options[0]) ps.options[0].textContent = T.t("prefAll");

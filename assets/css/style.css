@@ -117,3 +117,12 @@ main { padding: 22px 0 40px; }
   padding: 5px 14px; border-radius: 999px; font-size: .8rem; font-weight: 700;
 }
 .lang-btn:hover { background: rgba(255, 255, 255, .28); }
+
+/* 英語モードの注記(キーワード検索は日本語のみ) */
+.lang-note {
+  margin: 10px 0 0; font-size: .8rem; line-height: 1.5;
+  color: #fff; background: rgba(255, 255, 255, .12);
+  border-left: 3px solid rgba(255, 255, 255, .5);
+  padding: 8px 12px; border-radius: 8px;
+}
+.lang-note[hidden] { display: none; }
