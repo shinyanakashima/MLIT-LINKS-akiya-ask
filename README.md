@@ -1,108 +1,163 @@
-# MLIT-LINKS-akiya-ask
+# Akiya Finder (MLIT-LINKS-akiya-ask)
 
-日本語で問いかけて探す、格安空き家ファインダー。
+日本語の自然文で、全国の格安空き家・移住物件を横断検索できる Web アプリです。
+「予算300万以内、農地付き、海の近くで古民家」のように話し言葉で入力すると、
+条件に合う物件の一覧が出ます。
 
-国土交通省 Project LINKS の[空き家バンク登録物件(2025年度)](https://www.geospatial.jp/ckan/dataset/links-akiyabank-2025)(約7,700件)を、**DB不要の静的フロント**で全国横断検索する。「予算300万以内、農地付き、海の近くで古民家」のような日本語をそのまま投げて候補を得られる。
+🔗 **デモ**: https://mlit-links-akiya-ask.pages.dev/
 
-## 特徴
+データは国土交通省 Project LINKS の
+[空き家バンク登録物件(2025年度)](https://www.geospatial.jp/ckan/dataset/links-akiyabank-2025)
+(募集中 約7,500件)を利用しています。
 
-- **静的構成**: 物件データは静的JSON。検索・絞り込みはすべてクライアント側で完結。
-- **二系統の検索**:
-  - **AI検索** — 自然文を OpenAI API(`gpt-4o-mini`)で構造化フィルタJSONへ変換。
-    公開時(Cloudflare Pages)は Pages Function `/api/search` 経由でAPIキーをサーバ側に秘匿する。
-  - **キーワード検索** — サーバ(`/api/search`)が応答しない場合(ローカル開発・APIエラー・障害時)は
-    `filter.js` の素朴なパーサに自動フォールバック。
-- **絞り込み**: 都道府県/市区町村セレクト、価格・築年・特徴タグ。件数表示。
-- **原典誘導**: 各物件から自治体バンク原典リンクへ。
-- **日本語/英語切替**: ヘッダのボタンでUI全体をJP/EN切替(`assets/js/i18n.js`)。選択は localStorage に保存。物件データ(地名・PR文)は原文のまま。
+---
 
-## ディレクトリ構成
+## 何ができるか
+
+- **自然文で検索**: 「築30年以内で改修不要、駐車場あり」のような日本語をそのまま入力。
+- **手動絞り込み**: 都道府県・市区町村の選択、価格・築年・特徴タグでの絞り込み。
+- **原典への誘導**: 各物件から、掲載元の自治体空き家バンクへリンク。
+- **日本語 / 英語切替**: 画面右上のボタンでUIを切替(物件データ自体は日本語のまま)。
+
+## 仕組み(重要)
+
+このアプリの肝は **「AIは検索しない」** という点です。役割分担は次の通りです。
 
 ```
-index.html                  画面
-assets/css/style.css        スタイル
-assets/js/prompt.js         自然文→フィルタJSON 変換プロンプト(共用)
-assets/js/filter.js         フィルタスキーマ・キーワードパーサ・マッチング
-assets/js/ai.js             AI検索クライアント(/api/search 経由)
-assets/js/app.js            データ読込・UI制御・描画
-functions/api/search.js     Cloudflare Pages Function(OpenAI API、キー秘匿)
-data/akiya.sample.json      サンプルデータ(12件)
-data/akiya.json             本番データ(取り込みで生成。gitignore)
-scripts/import.mjs          pipeline JSON/CSV → 本スキーマ への変換
-docs/schema.md              データ & フィルタスキーマ設計
+あなたの入力（自然文）
+   │
+   ▼  テキストだけを送信
+ /api/search（サーバ関数）→ OpenAI
+   │
+   ▼  返ってくるのは「検索条件(JSON)」だけ（物件データは渡していない）
+ { priceMax: 3000000, propertyTypes:["古民家"], features:["海近い"] }
+   │
+   ▼  この条件で…
+ ブラウザ内の filter.js が、手元の物件JSONを1件ずつ照合
+   │
+   ▼
+ 合致した物件を表示
 ```
 
-## ローカルで動かす
+- **OpenAI の仕事は「自然文 → 検索条件(JSON)」の変換のみ。** 物件データは送られません
+  (プライバシー面で安全、データが増えても AI コストは一定)。
+- **実際の絞り込みはブラウザ内で完結**します(`filter.js`)。
+- **AI が使えないときは自動でキーワード検索に切り替わります**(下記)。
 
-静的ファイルなので任意の静的サーバでよい。
+### 2系統の検索とフォールバック
+
+| 経路 | いつ使われるか | 仕組み |
+| --- | --- | --- |
+| **AI検索** | 通常時(`/api/search` が応答) | OpenAI が自然文を検索条件へ変換 |
+| **キーワード検索** | サーバ関数が無い/失敗時(ローカル開発・APIエラー等) | `filter.js` の正規表現＋辞書で簡易抽出 |
+
+どちらの経路でも最終的に同じ形の「フィルタJSON」になるため、表示側は経路を意識しません。
+> 注: キーワード検索は日本語前提です。英語入力は AI検索でのみ機能します(英語UIに注記を表示)。
+
+## 技術スタック
+
+- **フロントエンド**: 素の HTML / CSS / JavaScript(フレームワーク・ビルド工程なし)。
+- **サーバ処理**: Cloudflare Pages Functions(`functions/api/search.js`)1本のみ。
+  OpenAI API キーをサーバ側に秘匿するためだけに存在します。
+- **データ**: 静的 JSON(`data/akiya.json`)。DB はありません。
+
+## クイックスタート(ローカル)
+
+静的ファイルなので任意の静的サーバで動きます。
 
 ```bash
+git clone https://github.com/shinyanakashima/mlit-links-akiya-ask.git
+cd mlit-links-akiya-ask
 python3 -m http.server 8000
-# http://localhost:8000 を開く
+# ブラウザで http://localhost:8000 を開く
 ```
 
-`data/akiya.json` が無ければ自動で `data/akiya.sample.json` を表示する。
-この状態では AI検索は使えないため、自動でキーワード検索にフォールバックする。
+- `data/akiya.json`(本番データ)が無ければ、自動で `data/akiya.sample.json`(12件)を表示します。
+- ローカルでは `/api/search` が無いため、**キーワード検索**で動作します(AI検索は本番のみ)。
+- AI検索もローカルで試したい場合は [デプロイ](#デプロイ) の `wrangler pages dev` を参照。
 
-## 本番データの取り込み
+## テスト
 
-物件データ `data/akiya.json` は MLIT-LINKS-akiya-pipeline の成果物から生成する
-(本ファイルは Git 管理外。`data/akiya.sample.json` が無い場合のみフォールバック)。
+```bash
+node scripts/test.mjs
+```
+
+キーワードパーサ・マッチング・JSON抽出・データ取り込みアダプタの単体テスト(依存なし)。
+
+## データの取り込み
+
+物件データ `data/akiya.json` は別リポジトリ
+[`MLIT-LINKS-akiya-pipeline`](https://github.com/shinyanakashima/MLIT-LINKS-akiya-pipeline)
+の成果物(正規化済みデータセット)から生成します。
+このリポジトリ自体は**データの正規化パイプラインを持たず**、その成果物を取り込むだけです。
+`data/akiya.json` は Git 管理外(生成物)です。
 
 ### 推奨: リリース成果物から取得(1コマンド)
 
-[`MLIT-LINKS-akiya-pipeline`](https://github.com/shinyanakashima/MLIT-LINKS-akiya-pipeline)
-の GitHub Release(成果物 `akiya-<year>.json`, CC-BY-4.0)を取得して取り込む。
-
 ```bash
-node scripts/fetch-dataset.mjs            # 既定タグ data-2025.1.0 を取得→import
-node scripts/fetch-dataset.mjs data-2026.1.0   # 翌年版に切替
+node scripts/fetch-dataset.mjs                 # 既定タグ data-2025.1.0 を取得→取り込み
+node scripts/fetch-dataset.mjs data-2026.1.0   # 別バージョンに切替
 ```
 
-`manifest.json` の `registered` 件数と取り込み結果を照合する(不一致なら exit 2)。
+GitHub Release の `akiya-<year>.json`(CC-BY-4.0)と `manifest.json` を取得し、
+`manifest` の件数と取り込み結果を照合します(不一致なら exit 2)。
 
-### 手動: 任意の JSON/CSV から生成
+### 手動: 任意の JSON / CSV から生成
 
 ```bash
 node scripts/import.mjs <input.json|input.csv> data/akiya.json
 ```
 
-- パイプラインのネスト/enum形式JSON(`prompts/akiya-dataset.md`)は、`location`/`deal_type`/
-  `tags` 等を検知して本スキーマへ射影する(成約済み `closed` は除外)。
-- 生CSVは列名の部分一致で対応付ける(都道府県/価格/築年/PR文/URL 等)。
-
-対応付けの詳細は [`docs/schema.md`](docs/schema.md) の「パイプライン出力からの対応付け」を参照。
+取り込みの対応付け(パイプラインのネスト/enum形式 → 本アプリのフラット形式)の詳細は
+[`docs/schema.md`](docs/schema.md) を参照。
 
 ## デプロイ
 
-### Cloudflare Pages(GitHub 連携・自動デプロイ)
+**Cloudflare Pages**(GitHub 連携の自動デプロイ)で公開しています。
+`main` への push で自動ビルド&デプロイされます(PR ごとにプレビューURLも生成)。
 
-GitHub 連携を使い、`main` への push で自動デプロイする(PR ごとにプレビューURLも自動生成)。
 Cloudflare ダッシュボードでの設定:
 
 1. リポジトリを Cloudflare Pages に接続(Production branch = `main`)。
 2. ビルド設定:
-   - **Framework preset**: なし(None)
+   - **Framework preset**: None
    - **Build command**: `node scripts/fetch-dataset.mjs`
    - **Build output directory**: `/`(ルート)
-   - ⚠️ `data/akiya.json` は Git 管理外のため、**ビルド時に上記コマンドで生成**する。
-     これを省くと本番データが無く `data/akiya.sample.json`(12件)にフォールバックする。
-3. 環境変数に `OPENAI_API_KEY` を設定(Functions から参照、クライアントには出ない)。
-   - 任意で `OPENAI_MODEL`(既定 `gpt-4o-mini`)、別オリジンから叩く場合のみ `ALLOW_ORIGIN` を設定。
-4. `functions/api/search.js` が自動でデプロイされ `/api/search` が有効になる。
+   - ⚠️ `data/akiya.json` は Git 管理外なので、**ビルド時に上記コマンドで生成**します。
+     省くと本番データが無く、サンプル12件にフォールバックします。
+3. 環境変数 `OPENAI_API_KEY` を設定(サーバ側のみ参照。クライアントには出ません)。
+   - 任意: `OPENAI_MODEL`(既定 `gpt-4o-mini`)、別オリジン配信時のみ `ALLOW_ORIGIN`。
 
-> 翌年版データに切り替えるときは Build command の引数でタグを指定:
-> `node scripts/fetch-dataset.mjs data-2026.1.0`
-
-ローカルで Functions を試す場合(`wrangler` 利用):
+ローカルで Functions(AI検索)を試す場合:
 
 ```bash
-echo 'OPENAI_API_KEY = "sk-..."' > .dev.vars   # gitignore 済み
+echo 'OPENAI_API_KEY = "sk-..."' > .dev.vars   # .gitignore 済み
 npx wrangler pages dev .
 ```
 
-`/api/search` が応答しない場合(APIエラー・障害時)は、自動でキーワード検索にフォールバックする。
+## ディレクトリ構成
+
+```
+index.html                  画面本体
+assets/css/style.css        スタイル
+assets/js/i18n.js           日本語/英語の文言辞書と切替
+assets/js/app.js            データ読込・UI制御・検索/絞り込み・段階描画
+assets/js/filter.js         フィルタ定義・キーワードパーサ・マッチング(検索エンジン本体)
+assets/js/ai.js             AI検索クライアント(/api/search 呼び出し+フォールバック)
+assets/js/prompt.js         自然文→フィルタJSON の変換プロンプトとJSON抽出
+functions/api/search.js     Cloudflare Pages Function(OpenAI 呼び出し・キー秘匿)
+scripts/fetch-dataset.mjs   パイプライン成果物の取得→取り込み
+scripts/import.mjs          成果物JSON/CSV → 本アプリ形式への変換アダプタ
+scripts/test.mjs            単体テスト
+data/akiya.sample.json      サンプルデータ(12件・コミット対象)
+data/akiya.json             本番データ(生成物・Git管理外)
+docs/architecture.md        構成図(Mermaid + 画像)
+docs/schema.md              データ&フィルタのスキーマ設計
+```
+
+構成図は [`docs/architecture.md`](docs/architecture.md) を参照。
 
 ## ライセンス / 出典
 
-物件データの出典は国土交通省 Project LINKS。物件の最新状況は各自治体バンクの原典で確認すること。
+物件データの出典は国土交通省 Project LINKS(CC-BY-4.0)。
+物件の最新状況は必ず各自治体の空き家バンク原典で確認してください。
