@@ -1,0 +1,7 @@
+node_modules/
+.DS_Store
+.dev.vars
+.wrangler/
+dist/
+# 本番データ(取り込み生成物。サンプルのみコミット)
+data/akiya.json
